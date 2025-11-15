@@ -1,48 +1,106 @@
 """
-Database Schemas
+Database Schemas for PharmaSure
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model maps to a MongoDB collection (lowercased class name).
 """
+from __future__ import annotations
+from typing import Optional, List, Literal, Any
+from datetime import datetime, date
+from pydantic import BaseModel, Field, EmailStr
 
-from pydantic import BaseModel, Field
-from typing import Optional
-
-# Example schemas (replace with your own):
+# Auth/account core
+class Account(BaseModel):
+    email: EmailStr
+    password_hash: str
+    role: Literal["user", "pharmacist"]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    dob: Optional[date] = None
+    caregiver: bool = False
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Pharmacist(BaseModel):
+    email: EmailStr
+    pharmacy_name: str
+    license_no: str
+    address: Optional[str] = None
+    contact: Optional[str] = None
 
-# Add your own schemas here:
-# --------------------------------------------------
+# Catalog
+class Medicine(BaseModel):
+    name: str
+    brand: Optional[str] = None
+    active_ingredient: Optional[str] = None
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
+    otc_flag: bool = True
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Batch(BaseModel):
+    medicine_id: str
+    batch_no: str
+    expiry_date: date
+    quantity: int = Field(ge=0, default=0)
+    price: float = Field(ge=0, default=0)
+
+# User medicine list
+class UserMedicine(BaseModel):
+    user_id: str
+    medicine_id: Optional[str] = None
+    batch_id: Optional[str] = None
+    name: str
+    dosage: Optional[str] = None
+    frequency: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    reminders: Optional[List[str]] = None  # ISO times or cron-like strings
+    notes: Optional[str] = None
+    expiry_date: Optional[date] = None
+
+# Prescription
+class Prescription(BaseModel):
+    user_id: str
+    pharmacist_id: Optional[str] = None
+    file_url: str
+    status: Literal["pending", "approved", "rejected"] = "pending"
+    uploaded_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+# Order
+class OrderItem(BaseModel):
+    medicine_id: Optional[str] = None
+    batch_id: Optional[str] = None
+    name: Optional[str] = None
+    qty: int
+    price: float
+
+class Order(BaseModel):
+    user_id: str
+    pharmacist_id: Optional[str] = None
+    items: List[OrderItem]
+    status: Literal["pending", "accepted", "ready", "dispensed", "rejected"] = "pending"
+    total: float
+    created_at: Optional[datetime] = None
+
+# Chat
+class ChatMessage(BaseModel):
+    conversation_id: str
+    from_role: Literal["user", "pharmacist"]
+    to_role: Literal["user", "pharmacist"]
+    content: str
+    attachments: Optional[List[str]] = None
+    timestamp: Optional[datetime] = None
+
+# Notifications
+class Notification(BaseModel):
+    user_id: Optional[str] = None
+    pharmacist_id: Optional[str] = None
+    type: str
+    payload: Any
+    read_flag: bool = False
+    created_at: Optional[datetime] = None
